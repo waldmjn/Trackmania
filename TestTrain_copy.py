@@ -25,7 +25,39 @@ class SaveEveryNEpochsCallback(BaseCallback):
                 print(f"Modell gespeichert: {model_path}")
         return True
 
+# Callback zum Loggen der Loss-Werte
+class LossLoggingCallback(BaseCallback):
+    def __init__(self, log_path="loss_log.txt", verbose=0, tensorboard_log="./ppo_trackmania_tensorboard/"):
+        super().__init__(verbose)
+        self.log_path = log_path
+        self.header_written = False
+        self.writer = SummaryWriter(tensorboard_log)  # Initialize TensorBoard writer
 
+    def _on_step(self) -> bool:
+        # Überprüfen, ob die EpInfo-Daten vorhanden sind und Loss-Werte extrahiert werden können
+        log_dict = self.model.logger.name_to_value
+
+        # Loss-Werte extrahieren
+        policy_loss = log_dict.get("train/loss")
+        value_loss = log_dict.get("train/value_loss")
+        entropy_loss = log_dict.get("train/entropy_loss")
+        approx_kl = log_dict.get("train/approx_kl")
+        
+        if policy_loss is not None:
+            # Die Loss-Werte in die Textdatei schreiben
+            with open(self.log_path, "a") as logfile:
+                if not self.header_written:
+                    logfile.write("step\tpolicy_loss\tvalue_loss\tentropy_loss\tapprox_kl\n")
+                    self.header_written = True
+                logfile.write(f"{self.num_timesteps}\t{policy_loss}\t{value_loss}\t{entropy_loss}\t{approx_kl}\n")
+
+            # Zusätzlich TensorBoard-Logging
+            self.writer.add_scalar("Loss/Policy_Loss", policy_loss, self.num_timesteps)
+            self.writer.add_scalar("Loss/Value_Loss", value_loss, self.num_timesteps)
+            self.writer.add_scalar("Loss/Entropy_Loss", entropy_loss, self.num_timesteps)
+            self.writer.add_scalar("Loss/Approx_KL", approx_kl, self.num_timesteps)
+
+        return True
 
 # Optional: Wrapper-Funktion für VectorEnv
 def make_env():
@@ -56,11 +88,14 @@ model = PPO(
 # Speichern alle (3 * n_steps) Schritte = alle 3 Epochs
 save_callback = SaveEveryNEpochsCallback(
     save_freq=10 * model.n_steps,
-    save_path="./saved_models4"
+    save_path="./saved_models5"
 )
 
+# Callback zum Loggen der Loss-Werte
+loss_callback = LossLoggingCallback()
+
 # Alle Callbacks zusammenstellen
-callback = CallbackList([save_callback])
+callback = CallbackList([save_callback, loss_callback])
 
 def redirect_stdout_to_log(log_file_path="output.txt"):
     # Öffne die Log-Datei im Anhängemodus (falls sie nicht existiert, wird sie erstellt)
@@ -78,7 +113,7 @@ def reset_stdout():
 redirect_stdout_to_log()
 
 # Training mit Callback
-model.learn(total_timesteps=20_000_000, callback=callback)
+model.learn(total_timesteps=10_000_000, callback=callback)
 
 # Modell speichern
 model.save("ppo_trackmania")
