@@ -24,4 +24,4 @@ Bevor das Projekt ausgeführt werden kann, müssen folgende Voraussetzungen erf�
 
 Ein Python-Environment muss eingerichtet werden (z. B. mit venv oder conda). Die benötigten Pakete sind in der requirements.txt zu finden.
 
-
+Ausführen der TestTrain.py startet das Trainimg mit PPO und TestTrainDQN.py startet das Training mit DQN.
